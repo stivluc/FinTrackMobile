@@ -90,7 +90,6 @@ export const AnalyticsSkeleton: React.FC = () => {
             <SkeletonLoader width={120} height={12} style={styles.centerMargin} />
           </View>
         </View>
-      </View>
 
         {/* Savings card skeleton */}
         <View style={styles.savingsCard}>
@@ -106,6 +105,7 @@ export const AnalyticsSkeleton: React.FC = () => {
             </View>
           </View>
         </View>
+      </View>
 
       {/* Category breakdown skeleton */}
       <View style={styles.sectionWithPadding}>
@@ -142,7 +142,7 @@ export const AnalyticsSkeleton: React.FC = () => {
       </View>
 
       {/* Insights skeleton */}
-      <View style={styles.sectionWithPadding}>
+      <View style={[styles.sectionWithPadding, { paddingBottom: theme.spacing.lg }]}>
         <SkeletonLoader width={80} height={20} style={styles.sectionTitle} />
         {[1, 2, 3].map((item) => (
           <View key={item} style={styles.insightCard}>

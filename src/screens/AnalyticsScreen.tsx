@@ -198,7 +198,7 @@ export default function AnalyticsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Analytics</Text>
@@ -676,7 +676,7 @@ const styles = StyleSheet.create({
   },
   insightsSection: {
     paddingHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.xl,
+    paddingBottom: theme.spacing.lg,
   },
   insightCard: {
     flexDirection: 'row',

@@ -152,7 +152,13 @@ export default function TransactionsScreen() {
       </View>
 
       <View style={styles.controlsContainer}>
-        <TextInput style={styles.searchInput} placeholder="Rechercher..." value={searchQuery} onChangeText={setSearchQuery} />
+        <TextInput 
+          style={styles.searchInput} 
+          placeholder="Rechercher..." 
+          placeholderTextColor={colors.text.muted}
+          value={searchQuery} 
+          onChangeText={setSearchQuery} 
+        />
         <View style={styles.filtersRow}>
           <TouchableOpacity style={[styles.filterButton, activeFilter === 'all' && styles.filterButtonActive]} onPress={() => setActiveFilter('all')}><Text style={[styles.filterButtonText, activeFilter === 'all' && styles.filterButtonTextActive]}>Toutes</Text></TouchableOpacity>
           <TouchableOpacity style={[styles.filterButton, activeFilter === 'INCOME' && styles.filterButtonActive]} onPress={() => setActiveFilter('INCOME')}><Text style={[styles.filterButtonText, activeFilter === 'INCOME' && styles.filterButtonTextActive]}>Revenus</Text></TouchableOpacity>

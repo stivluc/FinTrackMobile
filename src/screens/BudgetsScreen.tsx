@@ -150,7 +150,7 @@ export default function BudgetsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Budgets</Text>
