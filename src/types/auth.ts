@@ -1,10 +1,10 @@
 export interface User {
   id: number;
   email: string;
-  firstName: string;
-  lastName: string;
-  isActive: boolean;
-  dateJoined: string;
+  first_name: string;
+  last_name: string;
+  is_active: boolean;
+  date_joined: string;
 }
 
 export interface LoginCredentials {

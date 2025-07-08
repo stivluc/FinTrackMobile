@@ -2,7 +2,7 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { useAuth } from '../contexts/AuthContext';
-import HomeScreen from '../screens/HomeScreen';
+import TabNavigator from './TabNavigator';
 import SettingsScreen from '../screens/SettingsScreen';
 import LoginScreen from '../screens/LoginScreen';
 import LoadingScreen from '../components/LoadingScreen';
@@ -10,7 +10,7 @@ import { colors } from '../theme';
 
 export type RootStackParamList = {
   Login: undefined;
-  Home: undefined;
+  MainTabs: undefined;
   Settings: undefined;
 };
 
@@ -26,7 +26,7 @@ export default function AppNavigator() {
   return (
     <NavigationContainer>
       <Stack.Navigator 
-        initialRouteName={isAuthenticated ? "Home" : "Login"}
+        initialRouteName={isAuthenticated ? "MainTabs" : "Login"}
         screenOptions={{
           headerStyle: {
             backgroundColor: colors.background.paper,
@@ -50,9 +50,9 @@ export default function AppNavigator() {
         {isAuthenticated ? (
           <>
             <Stack.Screen 
-              name="Home" 
-              component={HomeScreen} 
-              options={{ title: 'FinTrack' }}
+              name="MainTabs" 
+              component={TabNavigator} 
+              options={{ headerShown: false }}
             />
             <Stack.Screen 
               name="Settings" 

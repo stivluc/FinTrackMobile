@@ -13,7 +13,7 @@ export default function HomeScreen() {
       
       {user && (
         <View style={styles.userInfo}>
-          <Text style={styles.welcomeText}>Bonjour {user.firstName} !</Text>
+          <Text style={styles.welcomeText}>Bonjour {user.first_name} !</Text>
           <Text style={styles.emailText}>{user.email}</Text>
         </View>
       )}

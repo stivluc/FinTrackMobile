@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User, LoginCredentials, AuthTokens, AuthContextType } from '../types/auth';
+import { apiService } from '../services/api';
+import { API_CONFIG } from '../config/api';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -29,14 +31,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const loadStoredAuth = async () => {
     try {
-      const [storedUser, storedTokens] = await Promise.all([
-        AsyncStorage.getItem('user'),
-        AsyncStorage.getItem('tokens'),
+      const [storedUser, accessToken, refreshToken] = await Promise.all([
+        AsyncStorage.getItem(API_CONFIG.STORAGE_KEYS.USER_DATA),
+        AsyncStorage.getItem(API_CONFIG.STORAGE_KEYS.ACCESS_TOKEN),
+        AsyncStorage.getItem(API_CONFIG.STORAGE_KEYS.REFRESH_TOKEN),
       ]);
 
-      if (storedUser && storedTokens) {
+      if (storedUser && accessToken && refreshToken) {
         setUser(JSON.parse(storedUser));
-        setTokens(JSON.parse(storedTokens));
+        setTokens({
+          access: accessToken,
+          refresh: refreshToken,
+        });
       }
     } catch (error) {
       console.error('Error loading stored auth:', error);
@@ -47,30 +53,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (credentials: LoginCredentials) => {
     try {
-      // TODO: Remplacer par l'appel à l'API réelle
-      // Simulation d'authentification
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Appel à l'API réelle
+      const user = await apiService.login(credentials);
       
-      const mockUser: User = {
-        id: 1,
-        email: credentials.email,
-        firstName: 'Demo',
-        lastName: 'User',
-        isActive: true,
-        dateJoined: new Date().toISOString(),
-      };
+      // Récupérer les tokens depuis AsyncStorage (stockés par apiService)
+      const [accessToken, refreshToken] = await Promise.all([
+        AsyncStorage.getItem(API_CONFIG.STORAGE_KEYS.ACCESS_TOKEN),
+        AsyncStorage.getItem(API_CONFIG.STORAGE_KEYS.REFRESH_TOKEN),
+      ]);
 
-      const mockTokens: AuthTokens = {
-        access: 'mock_access_token',
-        refresh: 'mock_refresh_token',
-      };
+      if (accessToken && refreshToken) {
+        const tokens: AuthTokens = {
+          access: accessToken,
+          refresh: refreshToken,
+        };
 
-      // Stocker les données
-      await AsyncStorage.setItem('user', JSON.stringify(mockUser));
-      await AsyncStorage.setItem('tokens', JSON.stringify(mockTokens));
+        // Stocker les données utilisateur
+        await AsyncStorage.setItem(API_CONFIG.STORAGE_KEYS.USER_DATA, JSON.stringify(user));
 
-      setUser(mockUser);
-      setTokens(mockTokens);
+        setUser(user);
+        setTokens(tokens);
+      } else {
+        throw new Error('Erreur lors de la récupération des tokens');
+      }
     } catch (error) {
       console.error('Login error:', error);
       throw error;
@@ -79,7 +84,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = async () => {
     try {
-      await AsyncStorage.multiRemove(['user', 'tokens']);
+      await apiService.clearTokens();
       setUser(null);
       setTokens(null);
     } catch (error) {
@@ -89,12 +94,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const refreshToken = async () => {
     try {
-      if (!tokens?.refresh) {
-        throw new Error('No refresh token available');
+      const success = await apiService.refreshAuthToken();
+      if (!success) {
+        await logout();
+        throw new Error('Unable to refresh token');
       }
-
-      // TODO: Implémenter le rafraîchissement du token avec l'API
-      console.log('Refreshing token...');
     } catch (error) {
       console.error('Token refresh error:', error);
       await logout();
