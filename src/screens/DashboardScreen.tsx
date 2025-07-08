@@ -37,8 +37,6 @@ export default function DashboardScreen() {
         apiService.getDashboardStats(),
         apiService.getTransactions({ limit: 3 })
       ]);
-      console.log('Debug - Dashboard Data:', JSON.stringify(statsData, null, 2));
-      console.log('Debug - Wealth Evolution:', statsData?.wealth_evolution);
       setDashboardData(statsData);
       setRecentTransactions(transactionsData.results || transactionsData);
     } catch (error: any) {
@@ -108,9 +106,6 @@ export default function DashboardScreen() {
   };
   
   const displayData = dashboardData || defaultData;
-  
-  // Log pour debug
-  console.log('Display Data Wealth Evolution:', displayData.wealth_evolution);
 
   const getChangeColor = (change: number): string => {
     if (change > 0) return colors.success;
