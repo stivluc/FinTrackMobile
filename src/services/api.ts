@@ -181,6 +181,24 @@ class ApiService {
     ]);
   }
 
+  // Méthodes Analytics
+  async getAnalytics(months: number = 6): Promise<any> {
+    return this.request<any>(`/transactions/analytics/?months=${months}`);
+  }
+
+  async getDashboardStats(): Promise<any> {
+    return this.request<any>('/transactions/dashboard_stats/');
+  }
+
+  async getBudgetOverview(): Promise<any> {
+    return this.request<any>('/budgets/overview/');
+  }
+
+  async getTransactions(params?: any): Promise<any> {
+    const queryString = params ? `?${new URLSearchParams(params).toString()}` : '';
+    return this.request<any>(`/transactions/${queryString}`);
+  }
+
   // Méthodes utilitaires
   async isAuthenticated(): Promise<boolean> {
     const token = await this.getAccessToken();

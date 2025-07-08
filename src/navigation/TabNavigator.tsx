@@ -56,13 +56,13 @@ export default function TabNavigator() {
           borderTopWidth: 1,
           borderTopColor: colors.border.primary,
           paddingBottom: 34, // Ajout de padding pour iPhone avec barre centrale
-          paddingTop: 6,
-          height: 90, // Augmentation de la hauteur pour accommoder le padding
+          paddingTop: 4,
+          height: 85, // Réduction de la hauteur
         },
         tabBarLabelStyle: {
-          fontSize: theme.typography.fontSize.xs,
+          fontSize: 10, // Réduction de la taille de police
           fontWeight: '500',
-          marginTop: 4,
+          marginTop: 2,
         },
         tabBarItemStyle: {
           paddingVertical: 4,
@@ -80,7 +80,7 @@ export default function TabNavigator() {
         name="Transactions"
         component={TransactionsScreen}
         options={{
-          tabBarLabel: 'Transactions',
+          tabBarLabel: 'Opérations',
         }}
       />
       <Tab.Screen

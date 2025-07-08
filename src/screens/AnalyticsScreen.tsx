@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,10 +7,14 @@ import {
   RefreshControl,
   TouchableOpacity,
   Dimensions,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, theme } from '../theme';
+import { apiService } from '../services/api';
+import { AnalyticsData } from '../types/api';
+import { AnalyticsSkeleton } from '../components/SkeletonLoader';
 
 const { width } = Dimensions.get('window');
 
@@ -32,6 +36,10 @@ interface MonthlyData {
 export default function AnalyticsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState(6);
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isFilterLoading, setIsFilterLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const periods = [
     { value: 3, label: '3 mois' },
@@ -39,84 +47,124 @@ export default function AnalyticsScreen() {
     { value: 12, label: '1 an' },
   ];
 
-  // Données simulées
-  const analyticsData = {
-    totalIncome: 19200.00,
-    totalExpenses: 13140.50,
-    totalSavings: 6059.50,
-    savingsRate: 31.56,
-    averageMonthlyIncome: 3200.00,
-    averageMonthlyExpenses: 2190.08,
+  useEffect(() => {
+    loadAnalyticsData();
+  }, [selectedPeriod]);
+
+  const loadAnalyticsData = async () => {
+    try {
+      setError(null);
+      const data = await apiService.getAnalytics(selectedPeriod);
+      setAnalyticsData(data);
+    } catch (error: any) {
+      console.error('Error loading analytics:', error);
+      setError('Erreur lors du chargement des données');
+      Alert.alert('Erreur', 'Impossible de charger les données analytics');
+    } finally {
+      setIsLoading(false);
+      setIsFilterLoading(false);
+    }
   };
 
-  const categoryData: CategoryData[] = [
-    {
-      name: 'Alimentation',
-      amount: 2920.00,
-      percentage: 22.2,
-      color: colors.primary.main,
-      icon: 'restaurant',
-    },
-    {
-      name: 'Transport',
-      amount: 1980.00,
-      percentage: 15.1,
-      color: colors.secondary.main,
-      icon: 'car',
-    },
-    {
-      name: 'Logement',
-      amount: 4200.00,
-      percentage: 32.0,
-      color: colors.info,
-      icon: 'home',
-    },
-    {
-      name: 'Loisirs',
-      amount: 1560.00,
-      percentage: 11.9,
-      color: colors.success,
-      icon: 'game-controller',
-    },
-    {
-      name: 'Shopping',
-      amount: 1240.50,
-      percentage: 9.4,
-      color: colors.warning,
-      icon: 'bag',
-    },
-    {
-      name: 'Santé',
-      amount: 890.00,
-      percentage: 6.8,
-      color: colors.error,
-      icon: 'medical',
-    },
-    {
-      name: 'Autres',
-      amount: 350.00,
-      percentage: 2.7,
-      color: colors.text.secondary,
-      icon: 'ellipsis-horizontal',
-    },
-  ];
+  // Préparer les données pour les graphiques
+  const getCategoryData = (): CategoryData[] => {
+    if (!analyticsData?.category_trends) return [];
+    
+    const categoryIcons: Record<string, string> = {
+      'Alimentation': 'restaurant',
+      'Transport': 'car',
+      'Logement': 'home',
+      'Loisirs': 'game-controller',
+      'Shopping': 'bag',
+      'Santé': 'medical',
+      'Divertissement': 'play',
+      'Autres': 'ellipsis-horizontal',
+    };
 
-  const monthlyData: MonthlyData[] = [
-    { month: 'Août', income: 3200, expenses: 2180, savings: 1020 },
-    { month: 'Sept', income: 3200, expenses: 2350, savings: 850 },
-    { month: 'Oct', income: 3200, expenses: 2090, savings: 1110 },
-    { month: 'Nov', income: 3200, expenses: 2240, savings: 960 },
-    { month: 'Déc', income: 3650, expenses: 2890, savings: 760 },
-    { month: 'Jan', income: 3200, expenses: 2190, savings: 1010 },
-  ];
+    const categoryColors = [
+      colors.primary.main,
+      colors.secondary.main,
+      colors.info,
+      colors.success,
+      colors.warning,
+      colors.error,
+      colors.text.secondary,
+    ];
 
-  const onRefresh = React.useCallback(() => {
+    // Utilisons directement total_expenses comme référence 
+    const totalExpenses = Math.abs(analyticsData.insights.total_expenses);
+    
+    // NOUVEAU: Ne prendre que la première occurrence de chaque catégorie
+    // car il semble y avoir une duplication massive dans l'API
+    const categoryMap: Record<string, number> = {};
+    const seenCategories = new Set<string>();
+    
+    console.log(`=== ANALYSE DES DOUBLONS (${analyticsData.category_trends.length} trends) ===`);
+    
+    analyticsData.category_trends.forEach((trend, index) => {
+      if (!seenCategories.has(trend.category)) {
+        // Première occurrence de cette catégorie
+        const totalAmount = trend.data.reduce((sum, item) => sum + Math.abs(item.amount), 0);
+        categoryMap[trend.category] = totalAmount;
+        seenCategories.add(trend.category);
+        console.log(`✅ ${trend.category}: ${totalAmount}€`);
+      } else {
+        // Doublon détecté - on ignore
+        const totalAmount = trend.data.reduce((sum, item) => sum + Math.abs(item.amount), 0);
+        console.log(`❌ DOUBLON ${trend.category}: ${totalAmount}€ (ignoré)`);
+      }
+    });
+    
+    // Calculer notre propre total pour voir la différence avec l'API
+    const ourCalculatedTotal = Object.values(categoryMap).reduce((sum, amount) => sum + amount, 0);
+    
+    console.log('=== RÉSULTAT FINAL ===');
+    console.log('Notre total calculé:', ourCalculatedTotal);
+    console.log('Total API:', totalExpenses);
+    console.log('Ratio:', (ourCalculatedTotal / totalExpenses).toFixed(2));
+    console.log('Breakdown par catégorie:', categoryMap);
+
+    // Utiliser notre total calculé pour les pourcentages pour garantir que ça fait 100%
+    const totalForPercentages = ourCalculatedTotal > 0 ? ourCalculatedTotal : totalExpenses;
+    
+    // Convertir en tableau et trier par montant décroissant
+    return Object.entries(categoryMap)
+      .map(([category, amount], index) => {
+        const percentage = totalForPercentages > 0 
+          ? (amount / totalForPercentages) * 100 
+          : 0;
+        
+        return {
+          name: category,
+          amount: amount,
+          percentage: Math.round(percentage * 10) / 10,
+          color: categoryColors[index % categoryColors.length],
+          icon: categoryIcons[category] || 'ellipsis-horizontal',
+        };
+      })
+      .sort((a, b) => b.amount - a.amount);
+  };
+
+  const getMonthlyData = (): MonthlyData[] => {
+    return analyticsData?.monthly_data || [];
+  };
+
+  const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
-    // TODO: Refresh analytics data
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 2000);
-  }, []);
+    await loadAnalyticsData();
+    setRefreshing(false);
+  }, [selectedPeriod]);
+
+  const handlePeriodChange = (newPeriod: number) => {
+    if (newPeriod !== selectedPeriod) {
+      setSelectedPeriod(newPeriod);
+      setIsFilterLoading(true);
+    }
+  };
+
+  if (isLoading && !analyticsData) {
+    return <AnalyticsSkeleton />;
+  }
 
   const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat('fr-FR', {
@@ -134,7 +182,8 @@ export default function AnalyticsScreen() {
         styles.periodButton,
         selectedPeriod === period.value && styles.periodButtonActive
       ]}
-      onPress={() => setSelectedPeriod(period.value)}
+      onPress={() => handlePeriodChange(period.value)}
+      disabled={isFilterLoading}
     >
       <Text style={[
         styles.periodButtonText,
@@ -145,12 +194,27 @@ export default function AnalyticsScreen() {
     </TouchableOpacity>
   );
 
+  // Utiliser les données réelles ou fallback
+  const displayData = analyticsData || {
+    insights: {
+      total_income: 0,
+      total_expenses: 0,
+      savings_rate: 0,
+      avg_monthly_savings: 0,
+    },
+    monthly_data: [],
+    category_trends: [],
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Analytics</Text>
-        <TouchableOpacity style={styles.exportButton}>
+        <TouchableOpacity 
+          style={styles.exportButton}
+          onPress={() => Alert.alert('Export', 'Fonctionnalité d\'export en cours de développement')}
+        >
           <Ionicons name="download" size={20} color={colors.primary.main} />
         </TouchableOpacity>
       </View>
@@ -161,6 +225,15 @@ export default function AnalyticsScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
+        {/* Loading overlay when changing filters */}
+        {isFilterLoading && (
+          <View style={styles.loadingOverlay}>
+            <View style={styles.loadingContainer}>
+              <Ionicons name="sync" size={24} color={colors.primary.main} />
+              <Text style={styles.loadingText}>Mise à jour des données...</Text>
+            </View>
+          </View>
+        )}
         {/* Period Selection */}
         <View style={styles.periodSelection}>
           {periods.map(renderPeriodButton)}
@@ -174,11 +247,11 @@ export default function AnalyticsScreen() {
                 <Ionicons name="trending-up" size={24} color={colors.success} />
               </View>
               <Text style={styles.summaryAmount}>
-                {formatCurrency(analyticsData.totalIncome)}
+                {formatCurrency(displayData.insights.total_income)}
               </Text>
               <Text style={styles.summaryLabel}>Revenus totaux</Text>
               <Text style={styles.summarySubtext}>
-                Moy. {formatCurrency(analyticsData.averageMonthlyIncome)}/mois
+                Moy. {formatCurrency(displayData.insights.avg_monthly_savings)}/mois
               </Text>
             </View>
 
@@ -187,11 +260,11 @@ export default function AnalyticsScreen() {
                 <Ionicons name="trending-down" size={24} color={colors.error} />
               </View>
               <Text style={styles.summaryAmount}>
-                {formatCurrency(analyticsData.totalExpenses)}
+                {formatCurrency(displayData.insights.total_expenses)}
               </Text>
               <Text style={styles.summaryLabel}>Dépenses totales</Text>
               <Text style={styles.summarySubtext}>
-                Moy. {formatCurrency(analyticsData.averageMonthlyExpenses)}/mois
+                Moy. {formatCurrency(displayData.insights.total_expenses / selectedPeriod)}/mois
               </Text>
             </View>
           </View>
@@ -203,13 +276,13 @@ export default function AnalyticsScreen() {
               </View>
               <View style={styles.savingsInfo}>
                 <Text style={styles.savingsAmount}>
-                  {formatCurrency(analyticsData.totalSavings)}
+                  {formatCurrency(displayData.insights.total_income - displayData.insights.total_expenses)}
                 </Text>
                 <Text style={styles.savingsLabel}>Épargne totale</Text>
               </View>
               <View style={styles.savingsRate}>
                 <Text style={styles.savingsRateText}>
-                  {analyticsData.savingsRate.toFixed(1)}%
+                  {displayData.insights.savings_rate.toFixed(1)}%
                 </Text>
                 <Text style={styles.savingsRateLabel}>Taux d'épargne</Text>
               </View>
@@ -223,7 +296,7 @@ export default function AnalyticsScreen() {
           
           {/* Simple Bar Chart */}
           <View style={styles.chartContainer}>
-            {categoryData.map((category, index) => (
+            {getCategoryData().map((category, index) => (
               <View key={index} style={styles.categoryItem}>
                 <View style={styles.categoryInfo}>
                   <View style={styles.categoryIcon}>
@@ -256,10 +329,11 @@ export default function AnalyticsScreen() {
           <Text style={styles.sectionTitle}>Évolution mensuelle</Text>
           
           <View style={styles.trendChart}>
-            {monthlyData.map((month, index) => {
+            {getMonthlyData().map((month, index) => {
+              const monthlyData = getMonthlyData();
               const maxAmount = Math.max(...monthlyData.map(m => m.income));
-              const incomeHeight = (month.income / maxAmount) * 100;
-              const expensesHeight = (month.expenses / maxAmount) * 100;
+              const incomeHeight = maxAmount > 0 ? (month.income / maxAmount) * 100 : 0;
+              const expensesHeight = maxAmount > 0 ? (Math.abs(month.expenses) / maxAmount) * 100 : 0;
               
               return (
                 <View key={index} style={styles.monthColumn}>
@@ -295,41 +369,55 @@ export default function AnalyticsScreen() {
         <View style={styles.insightsSection}>
           <Text style={styles.sectionTitle}>Insights</Text>
           
-          <View style={styles.insightCard}>
-            <View style={styles.insightIcon}>
-              <Ionicons name="trending-up" size={20} color={colors.success} />
-            </View>
-            <View style={styles.insightContent}>
-              <Text style={styles.insightTitle}>Excellente épargne</Text>
-              <Text style={styles.insightText}>
-                Votre taux d'épargne de 31.6% est supérieur à la moyenne recommandée de 20%.
-              </Text>
-            </View>
-          </View>
+          {analyticsData?.insights && (
+            <>
+              <View style={styles.insightCard}>
+                <View style={styles.insightIcon}>
+                  <Ionicons 
+                    name={analyticsData.insights.savings_rate >= 20 ? "trending-up" : "warning"} 
+                    size={20} 
+                    color={analyticsData.insights.savings_rate >= 20 ? colors.success : colors.warning} 
+                  />
+                </View>
+                <View style={styles.insightContent}>
+                  <Text style={styles.insightTitle}>
+                    {analyticsData.insights.savings_rate >= 20 ? "Excellente épargne" : "Épargne à améliorer"}
+                  </Text>
+                  <Text style={styles.insightText}>
+                    Votre taux d'épargne de {analyticsData.insights.savings_rate.toFixed(1)}% est{' '}
+                    {analyticsData.insights.savings_rate >= 20 ? "supérieur" : "inférieur"} à la moyenne recommandée de 20%.
+                  </Text>
+                </View>
+              </View>
 
-          <View style={styles.insightCard}>
-            <View style={styles.insightIcon}>
-              <Ionicons name="warning" size={20} color={colors.warning} />
-            </View>
-            <View style={styles.insightContent}>
-              <Text style={styles.insightTitle}>Attention aux loisirs</Text>
-              <Text style={styles.insightText}>
-                Vos dépenses en loisirs ont augmenté de 15% par rapport au mois dernier.
-              </Text>
-            </View>
-          </View>
+              {analyticsData.insights.biggest_expense && (
+                <View style={styles.insightCard}>
+                  <View style={styles.insightIcon}>
+                    <Ionicons name="alert-circle" size={20} color={colors.error} />
+                  </View>
+                  <View style={styles.insightContent}>
+                    <Text style={styles.insightTitle}>Plus grosse dépense</Text>
+                    <Text style={styles.insightText}>
+                      {formatCurrency(analyticsData.insights.biggest_expense.amount)} pour{' '}
+                      {analyticsData.insights.biggest_expense.description} ({analyticsData.insights.biggest_expense.category})
+                    </Text>
+                  </View>
+                </View>
+              )}
 
-          <View style={styles.insightCard}>
-            <View style={styles.insightIcon}>
-              <Ionicons name="bulb" size={20} color={colors.primary.main} />
-            </View>
-            <View style={styles.insightContent}>
-              <Text style={styles.insightTitle}>Optimisation possible</Text>
-              <Text style={styles.insightText}>
-                Vous pourriez économiser 200€/mois en réduisant vos sorties restaurant.
-              </Text>
-            </View>
-          </View>
+              <View style={styles.insightCard}>
+                <View style={styles.insightIcon}>
+                  <Ionicons name="bulb" size={20} color={colors.primary.main} />
+                </View>
+                <View style={styles.insightContent}>
+                  <Text style={styles.insightTitle}>Épargne mensuelle moyenne</Text>
+                  <Text style={styles.insightText}>
+                    Vous épargnez en moyenne {formatCurrency(analyticsData.insights.avg_monthly_savings)} par mois.
+                  </Text>
+                </View>
+              </View>
+            </>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -369,6 +457,7 @@ const styles = StyleSheet.create({
   periodSelection: {
     flexDirection: 'row',
     paddingHorizontal: theme.spacing.lg,
+    marginTop: theme.spacing.sm,
     marginBottom: theme.spacing.lg,
   },
   periodButton: {
@@ -629,5 +718,31 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.fontSize.sm,
     color: colors.text.secondary,
     lineHeight: theme.typography.lineHeight.md,
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  loadingContainer: {
+    backgroundColor: colors.background.paper,
+    padding: theme.spacing.lg,
+    borderRadius: theme.borderRadius.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border.primary,
+  },
+  loadingText: {
+    marginLeft: theme.spacing.sm,
+    fontSize: theme.typography.fontSize.sm,
+    color: colors.text.primary,
+    fontWeight: '500',
   },
 });
