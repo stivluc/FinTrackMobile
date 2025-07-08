@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { LineChart, PieChart } from 'react-native-chart-kit';
 import { useAuth } from '../contexts/AuthContext';
 import { colors, theme } from '../theme';
 import { apiService } from '../services/api';
@@ -66,6 +67,15 @@ export default function DashboardScreen() {
     }).format(amount);
   };
 
+  const formatCurrencyLarge = (amount: number): string => {
+    return new Intl.NumberFormat('fr-FR', {
+      style: 'currency',
+      currency: 'EUR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
   // Données par défaut si pas de données chargées
   const displayData = dashboardData || {
     current_month: {
@@ -117,12 +127,12 @@ export default function DashboardScreen() {
         <View style={styles.wealthCard}>
           <View style={styles.wealthHeader}>
             <View style={styles.wealthIcon}>
-              <Ionicons name="business" size={24} color={colors.primary.main} />
+              <Ionicons name="business" size={20} color={colors.primary.main} />
             </View>
             <View style={styles.wealthInfo}>
               <Text style={styles.wealthTitle}>Patrimoine Total</Text>
               <Text style={styles.wealthAmount}>
-                {formatCurrency(displayData.current_month.total_wealth)}
+                {formatCurrencyLarge(displayData.current_month.total_wealth)}
               </Text>
             </View>
             <View style={styles.wealthChange}>
@@ -137,9 +147,9 @@ export default function DashboardScreen() {
             </View>
           </View>
           
-          {/* Graphique d'évolution du patrimoine (placeholder) */}
+          {/* Graphique d'évolution du patrimoine */}
           <View style={styles.wealthChart}>
-            <Text style={styles.chartPlaceholder}>Graphique d'évolution du patrimoine</Text>
+            <Text style={styles.chartTitle}>Évolution (6 derniers mois)</Text>
           </View>
         </View>
 
@@ -153,7 +163,7 @@ export default function DashboardScreen() {
               </View>
               <Text style={styles.quickStatLabel}>Revenus</Text>
               <Text style={styles.quickStatAmount}>
-                {formatCurrency(displayData.current_month.income)}
+                {formatCurrencyLarge(displayData.current_month.income)}
               </Text>
               <Text style={[styles.quickStatChange, { color: getChangeColor(displayData.current_month.income_change) }]}>
                 {formatPercentage(displayData.current_month.income_change)}
@@ -166,7 +176,7 @@ export default function DashboardScreen() {
               </View>
               <Text style={styles.quickStatLabel}>Dépenses</Text>
               <Text style={styles.quickStatAmount}>
-                {formatCurrency(Math.abs(displayData.current_month.expenses))}
+                {formatCurrencyLarge(Math.abs(displayData.current_month.expenses))}
               </Text>
               <Text style={[styles.quickStatChange, { color: getChangeColor(-displayData.current_month.expenses_change) }]}>
                 {formatPercentage(-displayData.current_month.expenses_change)}
@@ -179,7 +189,7 @@ export default function DashboardScreen() {
               </View>
               <Text style={styles.quickStatLabel}>Épargne</Text>
               <Text style={styles.quickStatAmount}>
-                {formatCurrency(displayData.current_month.savings)}
+                {formatCurrencyLarge(displayData.current_month.savings)}
               </Text>
               <Text style={[styles.quickStatChange, { color: getChangeColor(displayData.current_month.savings_change) }]}>
                 {formatPercentage(displayData.current_month.savings_change)}
@@ -188,12 +198,91 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* Composition du patrimoine */}
-        <View style={styles.compositionCard}>
-          <Text style={styles.compositionTitle}>Composition du patrimoine</Text>
-          <View style={styles.compositionChart}>
-            <Text style={styles.chartPlaceholder}>Graphique de composition</Text>
-          </View>
+        {/* Graphique d'évolution - Pleine largeur */}
+        <View style={styles.chartSection}>
+          <Text style={styles.chartSectionTitle}>Évolution du patrimoine</Text>
+          {displayData.wealth_evolution && displayData.wealth_evolution.length > 0 ? (
+            <LineChart
+              data={{
+                labels: displayData.wealth_evolution.slice(-6).map(item => {
+                  const date = new Date(item.month);
+                  return date.toLocaleDateString('fr-FR', { month: 'short' });
+                }),
+                datasets: [{
+                  data: displayData.wealth_evolution.slice(-6).map(item => item.wealth),
+                  strokeWidth: 3,
+                }]
+              }}
+              width={screenWidth - theme.spacing.lg}
+              height={200}
+              chartConfig={{
+                backgroundColor: colors.background.paper,
+                backgroundGradientFrom: colors.background.paper,
+                backgroundGradientTo: colors.background.paper,
+                decimalPlaces: 0,
+                color: (opacity = 1) => `rgba(212, 175, 55, ${opacity})`,
+                labelColor: (opacity = 1) => colors.text.secondary,
+                style: {
+                  borderRadius: theme.borderRadius.lg,
+                },
+                propsForDots: {
+                  r: "4",
+                  strokeWidth: "2",
+                  stroke: colors.primary.main
+                },
+                propsForBackgroundLines: {
+                  strokeDasharray: "",
+                  stroke: colors.border.primary,
+                  strokeWidth: 1
+                },
+              }}
+              style={styles.chart}
+              bezier
+            />
+          ) : (
+            <View style={styles.noDataChart}>
+              <Text style={styles.noDataText}>Données d'évolution non disponibles</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Composition du patrimoine - Pleine largeur */}
+        <View style={styles.chartSection}>
+          <Text style={styles.chartSectionTitle}>Composition du patrimoine</Text>
+          {displayData.wealth_composition && displayData.wealth_composition.length > 0 ? (
+            <PieChart
+              data={displayData.wealth_composition.map((item, index) => ({
+                name: item.name,
+                value: item.size,
+                color: [
+                  colors.primary.main,
+                  colors.secondary.main,
+                  colors.info,
+                  colors.success,
+                  colors.warning,
+                  colors.error,
+                  '#8884d8',
+                  '#82ca9d'
+                ][index % 8],
+                legendFontColor: colors.text.secondary,
+                legendFontSize: 12,
+              }))}
+              width={screenWidth - theme.spacing.lg}
+              height={200}
+              chartConfig={{
+                color: (opacity = 1) => colors.text.primary,
+                labelColor: (opacity = 1) => colors.text.secondary,
+              }}
+              accessor="value"
+              backgroundColor="transparent"
+              paddingLeft="15"
+              style={styles.chart}
+            />
+          ) : (
+            <View style={styles.noDataChart}>
+              <Text style={styles.noDataText}>Données de composition non disponibles</Text>
+            </View>
+          )}
         </View>
 
         {/* Recent Transactions */}
@@ -293,9 +382,9 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.md,
   },
   wealthIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: colors.background.default,
     justifyContent: 'center',
     alignItems: 'center',
@@ -310,9 +399,10 @@ const styles = StyleSheet.create({
     marginBottom: theme.spacing.xs,
   },
   wealthAmount: {
-    fontSize: theme.typography.fontSize.xxxl,
+    fontSize: theme.typography.fontSize.xxl,
     fontWeight: 'bold',
     color: colors.text.primary,
+    flexShrink: 1,
   },
   wealthChange: {
     flexDirection: 'row',
@@ -324,15 +414,12 @@ const styles = StyleSheet.create({
     marginLeft: theme.spacing.xs,
   },
   wealthChart: {
-    height: 100,
-    backgroundColor: colors.background.default,
-    borderRadius: theme.borderRadius.md,
-    justifyContent: 'center',
-    alignItems: 'center',
+    paddingTop: theme.spacing.sm,
   },
-  chartPlaceholder: {
+  chartTitle: {
     fontSize: theme.typography.fontSize.sm,
     color: colors.text.secondary,
+    textAlign: 'center',
   },
   
   // Stats rapides groupées
@@ -390,29 +477,35 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   
-  // Composition du patrimoine
-  compositionCard: {
-    margin: theme.spacing.lg,
-    marginTop: 0,
-    padding: theme.spacing.lg,
-    backgroundColor: colors.background.paper,
-    borderRadius: theme.borderRadius.lg,
-    borderWidth: 1,
-    borderColor: colors.border.primary,
-    marginBottom: theme.spacing.md,
+  // Sections graphiques pleine largeur
+  chartSection: {
+    marginVertical: theme.spacing.md,
+    paddingHorizontal: theme.spacing.sm,
   },
-  compositionTitle: {
-    fontSize: theme.typography.fontSize.md,
-    fontWeight: '600',
+  chartSectionTitle: {
+    fontSize: theme.typography.fontSize.lg,
+    fontWeight: 'bold',
     color: colors.text.primary,
     marginBottom: theme.spacing.md,
+    marginLeft: theme.spacing.md,
   },
-  compositionChart: {
-    height: 120,
-    backgroundColor: colors.background.default,
-    borderRadius: theme.borderRadius.md,
+  chart: {
+    borderRadius: theme.borderRadius.lg,
+    marginHorizontal: theme.spacing.sm,
+  },
+  noDataChart: {
+    height: 200,
+    backgroundColor: colors.background.paper,
+    borderRadius: theme.borderRadius.lg,
     justifyContent: 'center',
     alignItems: 'center',
+    marginHorizontal: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border.primary,
+  },
+  noDataText: {
+    fontSize: theme.typography.fontSize.sm,
+    color: colors.text.secondary,
   },
   
   // Transactions récentes
