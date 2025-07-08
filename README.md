@@ -1,6 +1,6 @@
 # FinTrack Mobile 📱
 
-Application mobile de gestion financière développée avec React Native et Expo.
+Démo d'application mobile de gestion financière et budgets développée avec React Native et Expo, dans le cadre d'un recrutement.
 
 ## 🚀 Fonctionnalités
 
