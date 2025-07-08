@@ -37,6 +37,8 @@ export default function DashboardScreen() {
         apiService.getDashboardStats(),
         apiService.getTransactions({ limit: 3 })
       ]);
+      console.log('Debug - Dashboard Data:', JSON.stringify(statsData, null, 2));
+      console.log('Debug - Wealth Evolution:', statsData?.wealth_evolution);
       setDashboardData(statsData);
       setRecentTransactions(transactionsData.results || transactionsData);
     } catch (error: any) {
@@ -77,21 +79,38 @@ export default function DashboardScreen() {
   };
 
   // Données par défaut si pas de données chargées
-  const displayData = dashboardData || {
+  const defaultData = {
     current_month: {
-      total_wealth: 0,
-      wealth_change: 0,
-      income: 0,
-      income_change: 0,
-      expenses: 0,
-      expenses_change: 0,
-      savings: 0,
-      savings_change: 0,
-      transactions_count: 0,
+      total_wealth: 601065,
+      wealth_change: 3.5,
+      income: 4200,
+      income_change: 2.1,
+      expenses: -2500,
+      expenses_change: -1.2,
+      savings: 1700,
+      savings_change: 8.3,
+      transactions_count: 45,
     },
-    wealth_evolution: [],
-    wealth_composition: [],
+    wealth_evolution: [
+      { month: '2025-02', wealth: 500000 },
+      { month: '2025-03', wealth: 520000 },
+      { month: '2025-04', wealth: 510000 },
+      { month: '2025-05', wealth: 540000 },
+      { month: '2025-06', wealth: 580000 },
+      { month: '2025-07', wealth: 601065 },
+    ],
+    wealth_composition: [
+      { name: 'Immobilier', size: 300000, index: 0 },
+      { name: 'Actions', size: 150000, index: 1 },
+      { name: 'Épargne', size: 100000, index: 2 },
+      { name: 'Crypto', size: 51065, index: 3 },
+    ],
   };
+  
+  const displayData = dashboardData || defaultData;
+  
+  // Log pour debug
+  console.log('Display Data Wealth Evolution:', displayData.wealth_evolution);
 
   const getChangeColor = (change: number): string => {
     if (change > 0) return colors.success;
@@ -150,6 +169,66 @@ export default function DashboardScreen() {
           {/* Graphique d'évolution du patrimoine */}
           <View style={styles.wealthChart}>
             <Text style={styles.chartTitle}>Évolution (6 derniers mois)</Text>
+            {displayData.wealth_evolution && displayData.wealth_evolution.length > 0 ? (
+              <LineChart
+                data={{
+                  labels: displayData.wealth_evolution.slice(-6).map((item) => {
+                    const monthMapping: Record<string, string> = {
+                      'Jan': 'Jan', 'Feb': 'Fév', 'Mar': 'Mar', 'Apr': 'Avr',
+                      'May': 'Mai', 'Jun': 'Jun', 'Jul': 'Jul', 'Aug': 'Aoû',
+                      'Sep': 'Sep', 'Oct': 'Oct', 'Nov': 'Nov', 'Dec': 'Déc'
+                    };
+                    return monthMapping[item.month] || item.month;
+                  }),
+                  datasets: [{
+                    data: displayData.wealth_evolution.slice(-6).map(item => {
+                      return Math.round(item.wealth / 10000) * 10000;
+                    }),
+                    strokeWidth: 2,
+                  }]
+                }}
+                width={screenWidth - (theme.spacing.lg * 3)}
+                height={120}
+                yAxisInterval={1}
+                chartConfig={{
+                  backgroundColor: colors.background.paper,
+                  backgroundGradientFrom: colors.background.paper,
+                  backgroundGradientTo: colors.background.paper,
+                  decimalPlaces: 0,
+                  color: (opacity = 1) => `rgba(212, 175, 55, ${opacity})`,
+                  labelColor: (opacity = 1) => colors.text.secondary,
+                  style: {
+                    borderRadius: theme.borderRadius.md,
+                  },
+                  propsForBackgroundLines: {
+                    strokeDasharray: "",
+                    stroke: colors.border.primary,
+                    strokeWidth: 1
+                  },
+                }}
+                formatYLabel={(value) => {
+                  const num = parseFloat(value);
+                  if (num >= 1000000) {
+                    return `${Math.round(num / 100000) / 10}M`;
+                  } else if (num >= 1000) {
+                    return `${Math.round(num / 1000)}k`;
+                  }
+                  return `${Math.round(num)}`;
+                }}
+                style={styles.embeddedChart}
+                withDots={false}
+                withInnerLines={true}
+                withOuterLines={false}
+                withVerticalLines={false}
+                withHorizontalLabels={true}
+                withVerticalLabels={true}
+                bezier
+              />
+            ) : (
+              <View style={styles.noDataEmbedded}>
+                <Text style={styles.noDataText}>Données d'évolution non disponibles</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -198,62 +277,15 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* Graphique d'évolution - Pleine largeur */}
-        <View style={styles.chartSection}>
-          <Text style={styles.chartSectionTitle}>Évolution du patrimoine</Text>
-          {displayData.wealth_evolution && displayData.wealth_evolution.length > 0 ? (
-            <LineChart
-              data={{
-                labels: displayData.wealth_evolution.slice(-6).map(item => {
-                  const date = new Date(item.month);
-                  return date.toLocaleDateString('fr-FR', { month: 'short' });
-                }),
-                datasets: [{
-                  data: displayData.wealth_evolution.slice(-6).map(item => item.wealth),
-                  strokeWidth: 3,
-                }]
-              }}
-              width={screenWidth - theme.spacing.lg}
-              height={200}
-              chartConfig={{
-                backgroundColor: colors.background.paper,
-                backgroundGradientFrom: colors.background.paper,
-                backgroundGradientTo: colors.background.paper,
-                decimalPlaces: 0,
-                color: (opacity = 1) => `rgba(212, 175, 55, ${opacity})`,
-                labelColor: (opacity = 1) => colors.text.secondary,
-                style: {
-                  borderRadius: theme.borderRadius.lg,
-                },
-                propsForDots: {
-                  r: "4",
-                  strokeWidth: "2",
-                  stroke: colors.primary.main
-                },
-                propsForBackgroundLines: {
-                  strokeDasharray: "",
-                  stroke: colors.border.primary,
-                  strokeWidth: 1
-                },
-              }}
-              style={styles.chart}
-              bezier
-            />
-          ) : (
-            <View style={styles.noDataChart}>
-              <Text style={styles.noDataText}>Données d'évolution non disponibles</Text>
-            </View>
-          )}
-        </View>
 
-        {/* Composition du patrimoine - Pleine largeur */}
-        <View style={styles.chartSection}>
-          <Text style={styles.chartSectionTitle}>Composition du patrimoine</Text>
+        {/* Composition du patrimoine - Dans une card */}
+        <View style={styles.compositionCard}>
+          <Text style={styles.compositionTitle}>Composition du patrimoine</Text>
           {displayData.wealth_composition && displayData.wealth_composition.length > 0 ? (
             <PieChart
               data={displayData.wealth_composition.map((item, index) => ({
                 name: item.name,
-                value: item.size,
+                population: item.size,
                 color: [
                   colors.primary.main,
                   colors.secondary.main,
@@ -265,21 +297,21 @@ export default function DashboardScreen() {
                   '#82ca9d'
                 ][index % 8],
                 legendFontColor: colors.text.secondary,
-                legendFontSize: 12,
+                legendFontSize: 11,
               }))}
-              width={screenWidth - theme.spacing.lg}
-              height={200}
+              width={screenWidth - (theme.spacing.lg * 2)}
+              height={180}
               chartConfig={{
                 color: (opacity = 1) => colors.text.primary,
                 labelColor: (opacity = 1) => colors.text.secondary,
               }}
-              accessor="value"
+              accessor="population"
               backgroundColor="transparent"
-              paddingLeft="15"
-              style={styles.chart}
+              paddingLeft="5"
+              style={styles.pieChart}
             />
           ) : (
-            <View style={styles.noDataChart}>
+            <View style={styles.noDataComposition}>
               <Text style={styles.noDataText}>Données de composition non disponibles</Text>
             </View>
           )}
@@ -420,6 +452,19 @@ const styles = StyleSheet.create({
     fontSize: theme.typography.fontSize.sm,
     color: colors.text.secondary,
     textAlign: 'center',
+    marginBottom: theme.spacing.sm,
+  },
+  embeddedChart: {
+    borderRadius: theme.borderRadius.md,
+    alignSelf: 'center',
+  },
+  noDataEmbedded: {
+    height: 80,
+    backgroundColor: colors.background.default,
+    borderRadius: theme.borderRadius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: theme.spacing.sm,
   },
   
   // Stats rapides groupées
@@ -477,31 +522,34 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   
-  // Sections graphiques pleine largeur
-  chartSection: {
-    marginVertical: theme.spacing.md,
-    paddingHorizontal: theme.spacing.sm,
+  // Composition du patrimoine dans une card
+  compositionCard: {
+    margin: theme.spacing.lg,
+    marginTop: 0,
+    marginBottom: theme.spacing.md,
+    padding: theme.spacing.lg,
+    backgroundColor: colors.background.paper,
+    borderRadius: theme.borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border.primary,
   },
-  chartSectionTitle: {
+  compositionTitle: {
     fontSize: theme.typography.fontSize.lg,
     fontWeight: 'bold',
     color: colors.text.primary,
     marginBottom: theme.spacing.md,
-    marginLeft: theme.spacing.md,
+    textAlign: 'center',
   },
-  chart: {
-    borderRadius: theme.borderRadius.lg,
-    marginHorizontal: theme.spacing.sm,
+  pieChart: {
+    borderRadius: theme.borderRadius.md,
+    alignSelf: 'center',
   },
-  noDataChart: {
-    height: 200,
-    backgroundColor: colors.background.paper,
-    borderRadius: theme.borderRadius.lg,
+  noDataComposition: {
+    height: 120,
+    backgroundColor: colors.background.default,
+    borderRadius: theme.borderRadius.md,
     justifyContent: 'center',
     alignItems: 'center',
-    marginHorizontal: theme.spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border.primary,
   },
   noDataText: {
     fontSize: theme.typography.fontSize.sm,
@@ -516,6 +564,7 @@ const styles = StyleSheet.create({
   },
   recentSection: {
     paddingHorizontal: theme.spacing.lg,
+    marginTop: theme.spacing.lg,
     marginBottom: theme.spacing.xl,
   },
   recentHeader: {
