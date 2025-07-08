@@ -81,8 +81,7 @@ export interface Transaction {
 
 export interface Budget {
   id: number;
-  name: string;
-  allocated_amount: number;
+  allocated: number;
   period: 'WEEKLY' | 'MONTHLY' | 'YEARLY';
   category: {
     id: number;
@@ -90,8 +89,8 @@ export interface Budget {
     icon: string;
     color: string;
   };
-  spent_amount: number;
-  remaining_amount: number;
+  spent: number;
+  remaining: number;
   percentage_used: number;
   status: 'good' | 'warning' | 'exceeded';
   created_at: string;
@@ -103,7 +102,7 @@ export interface BudgetOverview {
     total_allocated: number;
     total_spent: number;
     total_remaining: number;
-    percentage_used: number;
+    overall_percentage: number;
   };
   budgets: Budget[];
 }

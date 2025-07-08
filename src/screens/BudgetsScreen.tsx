@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, theme } from '../theme';
+import { apiService } from '../services/api';
+import { BudgetOverview } from '../types/api';
 
 interface Budget {
   id: string;
@@ -25,84 +27,33 @@ interface Budget {
 
 export default function BudgetsScreen() {
   const [refreshing, setRefreshing] = useState(false);
+  const [budgetData, setBudgetData] = useState<BudgetOverview | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Données simulées
-  const budgetSummary = {
-    totalAllocated: 2500.00,
-    totalSpent: 1847.50,
-    remainingBudget: 652.50,
-    percentageUsed: 73.9,
+  // Charger les données de budgets depuis l'API
+  const loadBudgetData = async () => {
+    try {
+      setError(null);
+      const data = await apiService.getBudgetOverview();
+      setBudgetData(data);
+    } catch (error: any) {
+      console.error('Error loading budget data:', error);
+      setError('Erreur lors du chargement des budgets');
+      Alert.alert('Erreur', 'Impossible de charger les données des budgets');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const budgets: Budget[] = [
-    {
-      id: '1',
-      name: 'Alimentation',
-      category: 'Nourriture & Restaurants',
-      allocated: 600.00,
-      spent: 487.30,
-      period: 'Mensuel',
-      icon: 'restaurant',
-      color: colors.primary.main,
-    },
-    {
-      id: '2',
-      name: 'Transport',
-      category: 'Carburant & Transports',
-      allocated: 400.00,
-      spent: 320.85,
-      period: 'Mensuel',
-      icon: 'car',
-      color: colors.secondary.main,
-    },
-    {
-      id: '3',
-      name: 'Loisirs',
-      category: 'Divertissement',
-      allocated: 300.00,
-      spent: 245.60,
-      period: 'Mensuel',
-      icon: 'game-controller',
-      color: colors.info,
-    },
-    {
-      id: '4',
-      name: 'Shopping',
-      category: 'Achats & Vêtements',
-      allocated: 200.00,
-      spent: 156.75,
-      period: 'Mensuel',
-      icon: 'bag',
-      color: colors.success,
-    },
-    {
-      id: '5',
-      name: 'Santé',
-      category: 'Médical & Pharmacie',
-      allocated: 150.00,
-      spent: 89.00,
-      period: 'Mensuel',
-      icon: 'medical',
-      color: colors.error,
-    },
-    {
-      id: '6',
-      name: 'Éducation',
-      category: 'Formation & Livres',
-      allocated: 100.00,
-      spent: 45.00,
-      period: 'Mensuel',
-      icon: 'school',
-      color: colors.warning,
-    },
-  ];
+  useEffect(() => {
+    loadBudgetData();
+  }, []);
 
-  const onRefresh = React.useCallback(() => {
+  const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
-    // TODO: Refresh budgets data
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 2000);
+    await loadBudgetData();
+    setRefreshing(false);
   }, []);
 
   const handleAddBudget = () => {
@@ -149,6 +100,51 @@ export default function BudgetsScreen() {
     return 'OK';
   };
 
+  // Si pas de données chargées, utiliser des données par défaut
+  const displayData = budgetData || {
+    summary: {
+      total_allocated: 0,
+      total_spent: 0,
+      total_remaining: 0,
+      overall_percentage: 0,
+    },
+    budgets: [],
+  };
+
+  // Mapper les budgets de l'API vers le format local
+  const mappedBudgets = displayData.budgets.map((budget, index) => {
+    const iconMap: Record<string, string> = {
+      'Alimentation': 'restaurant',
+      'Transport': 'car',
+      'Loisirs': 'game-controller',
+      'Divertissement': 'game-controller',
+      'Shopping': 'bag',
+      'Santé': 'medical',
+      'Éducation': 'school',
+      'Formation': 'school',
+    };
+
+    const colorMap = [
+      colors.primary.main,
+      colors.secondary.main,
+      colors.info,
+      colors.success,
+      colors.error,
+      colors.warning,
+    ];
+
+    return {
+      id: budget.id.toString(),
+      name: budget.category.name,
+      category: budget.category.name,
+      allocated: budget.allocated,
+      spent: budget.spent,
+      period: 'Mensuel',
+      icon: iconMap[budget.category.name] || 'cash',
+      color: colorMap[index % colorMap.length],
+    };
+  });
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       {/* Header */}
@@ -173,13 +169,13 @@ export default function BudgetsScreen() {
             <View style={styles.summaryItem}>
               <Text style={styles.summaryLabel}>Budget total</Text>
               <Text style={styles.summaryAmount}>
-                {formatCurrency(budgetSummary.totalAllocated)}
+                {formatCurrency(displayData.summary.total_allocated)}
               </Text>
             </View>
             <View style={styles.summaryItem}>
               <Text style={styles.summaryLabel}>Dépensé</Text>
               <Text style={[styles.summaryAmount, { color: colors.warning }]}>
-                {formatCurrency(budgetSummary.totalSpent)}
+                {formatCurrency(Math.abs(displayData.summary.total_spent))}
               </Text>
             </View>
           </View>
@@ -187,14 +183,14 @@ export default function BudgetsScreen() {
           <View style={styles.summaryRow}>
             <View style={styles.summaryItem}>
               <Text style={styles.summaryLabel}>Restant</Text>
-              <Text style={[styles.summaryAmount, { color: colors.success }]}>
-                {formatCurrency(budgetSummary.remainingBudget)}
+              <Text style={[styles.summaryAmount, { color: displayData.summary.total_remaining >= 0 ? colors.success : colors.error }]}>
+                {formatCurrency(displayData.summary.total_remaining)}
               </Text>
             </View>
             <View style={styles.summaryItem}>
               <Text style={styles.summaryLabel}>Utilisé</Text>
-              <Text style={[styles.summaryAmount, { color: getProgressColor(budgetSummary.percentageUsed) }]}>
-                {budgetSummary.percentageUsed.toFixed(1)}%
+              <Text style={[styles.summaryAmount, { color: getProgressColor(displayData.summary.overall_percentage || 0) }]}>
+                {(displayData.summary.overall_percentage || 0).toFixed(1)}%
               </Text>
             </View>
           </View>
@@ -205,8 +201,8 @@ export default function BudgetsScreen() {
               <View style={[
                 styles.progressFill,
                 {
-                  width: `${budgetSummary.percentageUsed}%`,
-                  backgroundColor: getProgressColor(budgetSummary.percentageUsed),
+                  width: `${Math.min(displayData.summary.overall_percentage || 0, 100)}%`,
+                  backgroundColor: getProgressColor(displayData.summary.overall_percentage || 0),
                 }
               ]} />
             </View>
@@ -217,10 +213,11 @@ export default function BudgetsScreen() {
         <View style={styles.budgetsSection}>
           <Text style={styles.sectionTitle}>Mes budgets</Text>
           
-          {budgets.map((budget) => {
-            const percentage = (budget.spent / budget.allocated) * 100;
+          {mappedBudgets.map((budget) => {
+            const spentAmount = Math.abs(budget.spent);
+            const percentage = (spentAmount / budget.allocated) * 100;
             const progressColor = getProgressColor(percentage);
-            const status = getBudgetStatus(budget.spent, budget.allocated);
+            const status = getBudgetStatus(spentAmount, budget.allocated);
             
             return (
               <TouchableOpacity key={budget.id} style={styles.budgetCard}>
@@ -245,10 +242,10 @@ export default function BudgetsScreen() {
 
                 <View style={styles.budgetAmounts}>
                   <Text style={styles.budgetSpent}>
-                    {formatCurrency(budget.spent)} / {formatCurrency(budget.allocated)}
+                    {formatCurrency(spentAmount)} / {formatCurrency(budget.allocated)}
                   </Text>
                   <Text style={styles.budgetRemaining}>
-                    Reste : {formatCurrency(budget.allocated - budget.spent)}
+                    Reste : {formatCurrency(budget.allocated - spentAmount)}
                   </Text>
                 </View>
 
@@ -257,7 +254,7 @@ export default function BudgetsScreen() {
                     <View style={[
                       styles.progressFill,
                       {
-                        width: `${getProgressWidth(budget.spent, budget.allocated)}%`,
+                        width: `${getProgressWidth(spentAmount, budget.allocated)}%`,
                         backgroundColor: progressColor,
                       }
                     ]} />
