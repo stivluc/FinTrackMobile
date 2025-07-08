@@ -1,26 +1,60 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   ScrollView,
   StyleSheet,
   RefreshControl,
+  Alert,
+  TouchableOpacity,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { colors, theme } from '../theme';
+import { apiService } from '../services/api';
+import { DashboardStats, Transaction } from '../types/api';
+import { useNavigation } from '@react-navigation/native';
+
+const { width: screenWidth } = Dimensions.get('window');
 
 export default function DashboardScreen() {
   const { user } = useAuth();
-  const [refreshing, setRefreshing] = React.useState(false);
+  const navigation = useNavigation();
+  const [refreshing, setRefreshing] = useState(false);
+  const [dashboardData, setDashboardData] = useState<DashboardStats | null>(null);
+  const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const onRefresh = React.useCallback(() => {
+  // Charger les données du dashboard
+  const loadDashboardData = async () => {
+    try {
+      setError(null);
+      const [statsData, transactionsData] = await Promise.all([
+        apiService.getDashboardStats(),
+        apiService.getTransactions({ limit: 3 })
+      ]);
+      setDashboardData(statsData);
+      setRecentTransactions(transactionsData.results || transactionsData);
+    } catch (error: any) {
+      console.error('Error loading dashboard data:', error);
+      setError('Erreur lors du chargement des données');
+      Alert.alert('Erreur', 'Impossible de charger les données du dashboard');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
-    // TODO: Refresh dashboard data
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 2000);
+    await loadDashboardData();
+    setRefreshing(false);
   }, []);
 
   const formatCurrency = (amount: number): string => {
@@ -32,12 +66,38 @@ export default function DashboardScreen() {
     }).format(amount);
   };
 
-  // Données simulées pour le moment
-  const dashboardData = {
-    totalBalance: 5420.50,
-    monthlyIncome: 3200.00,
-    monthlyExpenses: 2180.75,
-    savingsRate: 31.8,
+  // Données par défaut si pas de données chargées
+  const displayData = dashboardData || {
+    current_month: {
+      total_wealth: 0,
+      wealth_change: 0,
+      income: 0,
+      income_change: 0,
+      expenses: 0,
+      expenses_change: 0,
+      savings: 0,
+      savings_change: 0,
+      transactions_count: 0,
+    },
+    wealth_evolution: [],
+    wealth_composition: [],
+  };
+
+  const getChangeColor = (change: number): string => {
+    if (change > 0) return colors.success;
+    if (change < 0) return colors.error;
+    return colors.text.secondary;
+  };
+
+  const getChangeIcon = (change: number): string => {
+    if (change > 0) return 'trending-up';
+    if (change < 0) return 'trending-down';
+    return 'remove';
+  };
+
+  const formatPercentage = (value: number): string => {
+    const sign = value > 0 ? '+' : '';
+    return `${sign}${value.toFixed(1)}%`;
   };
 
   return (
@@ -50,116 +110,148 @@ export default function DashboardScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>Bonjour,</Text>
-            <Text style={styles.userName}>{user?.first_name || 'Utilisateur'}</Text>
+          <Text style={styles.title}>Dashboard</Text>
+        </View>
+
+        {/* Patrimoine Total - Grande carte */}
+        <View style={styles.wealthCard}>
+          <View style={styles.wealthHeader}>
+            <View style={styles.wealthIcon}>
+              <Ionicons name="business" size={24} color={colors.primary.main} />
+            </View>
+            <View style={styles.wealthInfo}>
+              <Text style={styles.wealthTitle}>Patrimoine Total</Text>
+              <Text style={styles.wealthAmount}>
+                {formatCurrency(displayData.current_month.total_wealth)}
+              </Text>
+            </View>
+            <View style={styles.wealthChange}>
+              <Ionicons 
+                name={getChangeIcon(displayData.current_month.wealth_change)} 
+                size={16} 
+                color={getChangeColor(displayData.current_month.wealth_change)} 
+              />
+              <Text style={[styles.wealthChangeText, { color: getChangeColor(displayData.current_month.wealth_change) }]}>
+                {formatPercentage(displayData.current_month.wealth_change)}
+              </Text>
+            </View>
           </View>
-          <View style={styles.notificationIcon}>
-            <Ionicons name="notifications-outline" size={24} color={colors.primary.main} />
+          
+          {/* Graphique d'évolution du patrimoine (placeholder) */}
+          <View style={styles.wealthChart}>
+            <Text style={styles.chartPlaceholder}>Graphique d'évolution du patrimoine</Text>
           </View>
         </View>
 
-        {/* Balance Card */}
-        <View style={styles.balanceCard}>
-          <Text style={styles.balanceLabel}>Solde total</Text>
-          <Text style={styles.balanceAmount}>
-            {formatCurrency(dashboardData.totalBalance)}
-          </Text>
-          <View style={styles.balanceChange}>
-            <Ionicons name="trending-up" size={16} color={colors.success} />
-            <Text style={styles.balanceChangeText}>+2.4% ce mois</Text>
-          </View>
-        </View>
-
-        {/* Stats Grid */}
-        <View style={styles.statsGrid}>
-          <View style={styles.statCard}>
-            <View style={styles.statIcon}>
-              <Ionicons name="arrow-down" size={20} color={colors.success} />
+        {/* Stats rapides - Revenus/Dépenses/Épargne */}
+        <View style={styles.quickStatsCard}>
+          <Text style={styles.quickStatsTitle}>30 derniers jours</Text>
+          <View style={styles.quickStatsRow}>
+            <View style={styles.quickStat}>
+              <View style={styles.quickStatIcon}>
+                <Ionicons name="trending-up" size={18} color={colors.success} />
+              </View>
+              <Text style={styles.quickStatLabel}>Revenus</Text>
+              <Text style={styles.quickStatAmount}>
+                {formatCurrency(displayData.current_month.income)}
+              </Text>
+              <Text style={[styles.quickStatChange, { color: getChangeColor(displayData.current_month.income_change) }]}>
+                {formatPercentage(displayData.current_month.income_change)}
+              </Text>
             </View>
-            <Text style={styles.statAmount}>
-              {formatCurrency(dashboardData.monthlyIncome)}
-            </Text>
-            <Text style={styles.statLabel}>Revenus</Text>
-          </View>
-
-          <View style={styles.statCard}>
-            <View style={styles.statIcon}>
-              <Ionicons name="arrow-up" size={20} color={colors.error} />
+            
+            <View style={styles.quickStat}>
+              <View style={styles.quickStatIcon}>
+                <Ionicons name="trending-down" size={18} color={colors.error} />
+              </View>
+              <Text style={styles.quickStatLabel}>Dépenses</Text>
+              <Text style={styles.quickStatAmount}>
+                {formatCurrency(Math.abs(displayData.current_month.expenses))}
+              </Text>
+              <Text style={[styles.quickStatChange, { color: getChangeColor(-displayData.current_month.expenses_change) }]}>
+                {formatPercentage(-displayData.current_month.expenses_change)}
+              </Text>
             </View>
-            <Text style={styles.statAmount}>
-              {formatCurrency(dashboardData.monthlyExpenses)}
-            </Text>
-            <Text style={styles.statLabel}>Dépenses</Text>
-          </View>
-
-          <View style={styles.statCard}>
-            <View style={styles.statIcon}>
-              <Ionicons name="wallet" size={20} color={colors.primary.main} />
-            </View>
-            <Text style={styles.statAmount}>{dashboardData.savingsRate}%</Text>
-            <Text style={styles.statLabel}>Épargne</Text>
-          </View>
-        </View>
-
-        {/* Quick Actions */}
-        <View style={styles.quickActions}>
-          <Text style={styles.sectionTitle}>Actions rapides</Text>
-          <View style={styles.actionButtons}>
-            <View style={styles.actionButton}>
-              <Ionicons name="add-circle" size={24} color={colors.primary.main} />
-              <Text style={styles.actionText}>Ajouter</Text>
-            </View>
-            <View style={styles.actionButton}>
-              <Ionicons name="analytics" size={24} color={colors.primary.main} />
-              <Text style={styles.actionText}>Analyser</Text>
-            </View>
-            <View style={styles.actionButton}>
-              <Ionicons name="card" size={24} color={colors.primary.main} />
-              <Text style={styles.actionText}>Budgets</Text>
-            </View>
-            <View style={styles.actionButton}>
-              <Ionicons name="settings" size={24} color={colors.primary.main} />
-              <Text style={styles.actionText}>Réglages</Text>
+            
+            <View style={styles.quickStat}>
+              <View style={styles.quickStatIcon}>
+                <Ionicons name="wallet" size={18} color={colors.info} />
+              </View>
+              <Text style={styles.quickStatLabel}>Épargne</Text>
+              <Text style={styles.quickStatAmount}>
+                {formatCurrency(displayData.current_month.savings)}
+              </Text>
+              <Text style={[styles.quickStatChange, { color: getChangeColor(displayData.current_month.savings_change) }]}>
+                {formatPercentage(displayData.current_month.savings_change)}
+              </Text>
             </View>
           </View>
         </View>
 
-        {/* Recent Transactions Preview */}
+        {/* Composition du patrimoine */}
+        <View style={styles.compositionCard}>
+          <Text style={styles.compositionTitle}>Composition du patrimoine</Text>
+          <View style={styles.compositionChart}>
+            <Text style={styles.chartPlaceholder}>Graphique de composition</Text>
+          </View>
+        </View>
+
+        {/* Recent Transactions */}
         <View style={styles.recentSection}>
-          <Text style={styles.sectionTitle}>Transactions récentes</Text>
-          <View style={styles.transactionItem}>
-            <View style={styles.transactionIcon}>
-              <Ionicons name="restaurant" size={20} color={colors.error} />
-            </View>
-            <View style={styles.transactionInfo}>
-              <Text style={styles.transactionTitle}>Restaurant Le Gourmet</Text>
-              <Text style={styles.transactionDate}>Aujourd'hui, 12:30</Text>
-            </View>
-            <Text style={styles.transactionAmount}>-45.80 €</Text>
+          <View style={styles.recentHeader}>
+            <Text style={styles.sectionTitle}>Transactions récentes</Text>
+            <TouchableOpacity 
+              style={styles.viewMoreButton}
+              onPress={() => navigation.navigate('Transactions' as never)}
+            >
+              <Text style={styles.viewMoreText}>Voir plus</Text>
+              <Ionicons name="arrow-forward" size={16} color={colors.primary.main} />
+            </TouchableOpacity>
           </View>
+          
+          {recentTransactions.length > 0 ? (
+            recentTransactions.slice(0, 3).map((transaction) => {
+              const iconMap: Record<string, string> = {
+                'Alimentation': 'restaurant',
+                'Transport': 'car',
+                'Logement': 'home',
+                'Santé': 'medical',
+                'Loisirs': 'game-controller',
+                'Shopping': 'bag',
+                'Salaire': 'card',
+                'Freelance': 'briefcase',
+                'Autres revenus': 'cash',
+              };
 
-          <View style={styles.transactionItem}>
-            <View style={styles.transactionIcon}>
-              <Ionicons name="car" size={20} color={colors.error} />
-            </View>
-            <View style={styles.transactionInfo}>
-              <Text style={styles.transactionTitle}>Station Total</Text>
-              <Text style={styles.transactionDate}>Hier, 17:45</Text>
-            </View>
-            <Text style={styles.transactionAmount}>-67.20 €</Text>
-          </View>
+              const isIncome = transaction.amount > 0;
+              const iconName = iconMap[transaction.category.name] || 'card';
+              const iconColor = isIncome ? colors.success : colors.error;
 
-          <View style={styles.transactionItem}>
-            <View style={styles.transactionIcon}>
-              <Ionicons name="card" size={20} color={colors.success} />
-            </View>
-            <View style={styles.transactionInfo}>
-              <Text style={styles.transactionTitle}>Salaire</Text>
-              <Text style={styles.transactionDate}>01 Jan 2025</Text>
-            </View>
-            <Text style={[styles.transactionAmount, styles.incomeAmount]}>+3200.00 €</Text>
-          </View>
+              return (
+                <View key={transaction.id} style={styles.transactionItem}>
+                  <View style={styles.transactionIcon}>
+                    <Ionicons name={iconName as any} size={20} color={iconColor} />
+                  </View>
+                  <View style={styles.transactionInfo}>
+                    <Text style={styles.transactionTitle}>{transaction.description}</Text>
+                    <Text style={styles.transactionDate}>
+                      {new Date(transaction.date).toLocaleDateString('fr-FR', {
+                        day: 'numeric',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </Text>
+                  </View>
+                  <Text style={[styles.transactionAmount, isIncome && styles.incomeAmount]}>
+                    {isIncome ? '+' : ''}{formatCurrency(Math.abs(transaction.amount))}
+                  </Text>
+                </View>
+              );
+            })
+          ) : (
+            <Text style={styles.emptyText}>Aucune transaction récente</Text>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -175,32 +267,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     padding: theme.spacing.lg,
     paddingBottom: theme.spacing.md,
   },
-  greeting: {
-    fontSize: theme.typography.fontSize.md,
-    color: colors.text.secondary,
-  },
-  userName: {
+  title: {
     fontSize: theme.typography.fontSize.xl,
     fontWeight: 'bold',
     color: colors.text.primary,
   },
-  notificationIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.background.paper,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border.primary,
-  },
-  balanceCard: {
+  
+  // Carte patrimoine principal
+  wealthCard: {
     margin: theme.spacing.lg,
     marginTop: 0,
     padding: theme.spacing.lg,
@@ -208,93 +285,163 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.lg,
     borderWidth: 1,
     borderColor: colors.border.primary,
+    marginBottom: theme.spacing.md,
   },
-  balanceLabel: {
-    fontSize: theme.typography.fontSize.sm,
-    color: colors.text.secondary,
-    marginBottom: theme.spacing.xs,
-  },
-  balanceAmount: {
-    fontSize: theme.typography.fontSize.xxxl + 4,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-    marginBottom: theme.spacing.sm,
-  },
-  balanceChange: {
+  wealthHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: theme.spacing.md,
   },
-  balanceChangeText: {
-    fontSize: theme.typography.fontSize.sm,
-    color: colors.success,
-    marginLeft: theme.spacing.xs,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    paddingHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.lg,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: colors.background.paper,
-    padding: theme.spacing.md,
-    borderRadius: theme.borderRadius.md,
-    marginHorizontal: theme.spacing.xs,
-    borderWidth: 1,
-    borderColor: colors.border.primary,
-    alignItems: 'center',
-  },
-  statIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  wealthIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: colors.background.default,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: theme.spacing.sm,
+    marginRight: theme.spacing.md,
   },
-  statAmount: {
-    fontSize: theme.typography.fontSize.lg,
+  wealthInfo: {
+    flex: 1,
+  },
+  wealthTitle: {
+    fontSize: theme.typography.fontSize.md,
+    color: colors.text.secondary,
+    marginBottom: theme.spacing.xs,
+  },
+  wealthAmount: {
+    fontSize: theme.typography.fontSize.xxxl,
+    fontWeight: 'bold',
+    color: colors.text.primary,
+  },
+  wealthChange: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  wealthChangeText: {
+    fontSize: theme.typography.fontSize.sm,
+    fontWeight: '600',
+    marginLeft: theme.spacing.xs,
+  },
+  wealthChart: {
+    height: 100,
+    backgroundColor: colors.background.default,
+    borderRadius: theme.borderRadius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chartPlaceholder: {
+    fontSize: theme.typography.fontSize.sm,
+    color: colors.text.secondary,
+  },
+  
+  // Stats rapides groupées
+  quickStatsCard: {
+    margin: theme.spacing.lg,
+    marginTop: 0,
+    padding: theme.spacing.lg,
+    backgroundColor: colors.background.paper,
+    borderRadius: theme.borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border.primary,
+    marginBottom: theme.spacing.md,
+  },
+  quickStatsTitle: {
+    fontSize: theme.typography.fontSize.md,
+    fontWeight: '600',
+    color: colors.text.primary,
+    marginBottom: theme.spacing.md,
+    textAlign: 'center',
+  },
+  quickStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  quickStat: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing.xs,
+  },
+  quickStatIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.background.default,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: theme.spacing.xs,
+  },
+  quickStatLabel: {
+    fontSize: theme.typography.fontSize.xs,
+    color: colors.text.secondary,
+    marginBottom: theme.spacing.xs,
+    textAlign: 'center',
+  },
+  quickStatAmount: {
+    fontSize: theme.typography.fontSize.sm,
     fontWeight: 'bold',
     color: colors.text.primary,
     marginBottom: theme.spacing.xs,
-  },
-  statLabel: {
-    fontSize: theme.typography.fontSize.xs,
-    color: colors.text.secondary,
     textAlign: 'center',
   },
-  quickActions: {
-    paddingHorizontal: theme.spacing.lg,
-    marginBottom: theme.spacing.lg,
+  quickStatChange: {
+    fontSize: theme.typography.fontSize.xs,
+    fontWeight: '600',
+    textAlign: 'center',
   },
+  
+  // Composition du patrimoine
+  compositionCard: {
+    margin: theme.spacing.lg,
+    marginTop: 0,
+    padding: theme.spacing.lg,
+    backgroundColor: colors.background.paper,
+    borderRadius: theme.borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border.primary,
+    marginBottom: theme.spacing.md,
+  },
+  compositionTitle: {
+    fontSize: theme.typography.fontSize.md,
+    fontWeight: '600',
+    color: colors.text.primary,
+    marginBottom: theme.spacing.md,
+  },
+  compositionChart: {
+    height: 120,
+    backgroundColor: colors.background.default,
+    borderRadius: theme.borderRadius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  // Transactions récentes
   sectionTitle: {
     fontSize: theme.typography.fontSize.lg,
     fontWeight: 'bold',
     color: colors.text.primary,
-    marginBottom: theme.spacing.md,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  actionButton: {
-    alignItems: 'center',
-    padding: theme.spacing.md,
-    backgroundColor: colors.background.paper,
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.border.primary,
-    minWidth: 70,
-  },
-  actionText: {
-    fontSize: theme.typography.fontSize.xs,
-    color: colors.text.secondary,
-    marginTop: theme.spacing.xs,
   },
   recentSection: {
     paddingHorizontal: theme.spacing.lg,
     marginBottom: theme.spacing.xl,
+  },
+  recentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: theme.spacing.md,
+  },
+  viewMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs,
+  },
+  viewMoreText: {
+    fontSize: theme.typography.fontSize.sm,
+    color: colors.primary.main,
+    marginRight: theme.spacing.xs,
+    fontWeight: '600',
   },
   transactionItem: {
     flexDirection: 'row',
@@ -336,5 +483,11 @@ const styles = StyleSheet.create({
   },
   incomeAmount: {
     color: colors.success,
+  },
+  emptyText: {
+    fontSize: theme.typography.fontSize.md,
+    color: colors.text.secondary,
+    textAlign: 'center',
+    padding: theme.spacing.lg,
   },
 });

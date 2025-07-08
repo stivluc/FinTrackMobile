@@ -178,7 +178,7 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>Application</Text>
           <View style={styles.appInfo}>
             <Text style={styles.appName}>FinTrack Mobile</Text>
-            <Text style={styles.appVersion}>Version 1.0.0</Text>
+            <Text style={styles.appVersion}>Version 0.1.0</Text>
             <Text style={styles.appDescription}>
               Votre compagnon pour une gestion financière intelligente
             </Text>
