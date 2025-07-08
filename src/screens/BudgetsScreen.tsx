@@ -6,6 +6,7 @@ import {
   StyleSheet,
   RefreshControl,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -104,6 +105,22 @@ export default function BudgetsScreen() {
     }, 2000);
   }, []);
 
+  const handleAddBudget = () => {
+    Alert.alert('Nouveau budget', 'Fonctionnalité en cours de développement');
+  };
+
+  const handleNewBudget = () => {
+    Alert.alert('Nouveau budget', 'Fonctionnalité en cours de développement');
+  };
+
+  const handleAnalytics = () => {
+    Alert.alert('Analyse des budgets', 'Fonctionnalité en cours de développement');
+  };
+
+  const handleSettings = () => {
+    Alert.alert('Paramètres budgets', 'Fonctionnalité en cours de développement');
+  };
+
   const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat('fr-FR', {
       style: 'currency',
@@ -128,7 +145,7 @@ export default function BudgetsScreen() {
     const percentage = (spent / allocated) * 100;
     if (percentage >= 100) return 'Dépassé';
     if (percentage >= 90) return 'Attention';
-    if (percentage >= 75) return 'En cours';
+    if (percentage >= 75) return 'En approche';
     return 'OK';
   };
 
@@ -137,7 +154,7 @@ export default function BudgetsScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Budgets</Text>
-        <TouchableOpacity style={styles.addButton}>
+        <TouchableOpacity style={styles.addButton} onPress={handleAddBudget}>
           <Ionicons name="add" size={24} color={colors.background.default} />
         </TouchableOpacity>
       </View>
@@ -255,15 +272,15 @@ export default function BudgetsScreen() {
         <View style={styles.quickActions}>
           <Text style={styles.sectionTitle}>Actions rapides</Text>
           <View style={styles.actionButtons}>
-            <TouchableOpacity style={styles.actionButton}>
+            <TouchableOpacity style={styles.actionButton} onPress={handleNewBudget}>
               <Ionicons name="add-circle" size={24} color={colors.primary.main} />
               <Text style={styles.actionText}>Nouveau budget</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton}>
+            <TouchableOpacity style={styles.actionButton} onPress={handleAnalytics}>
               <Ionicons name="analytics" size={24} color={colors.primary.main} />
               <Text style={styles.actionText}>Analyse</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton}>
+            <TouchableOpacity style={styles.actionButton} onPress={handleSettings}>
               <Ionicons name="settings" size={24} color={colors.primary.main} />
               <Text style={styles.actionText}>Paramètres</Text>
             </TouchableOpacity>

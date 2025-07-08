@@ -99,7 +99,6 @@ export default function AnalyticsScreen() {
     const categoryMap: Record<string, number> = {};
     const seenCategories = new Set<string>();
     
-    console.log(`=== ANALYSE DES DOUBLONS (${analyticsData.category_trends.length} trends) ===`);
     
     analyticsData.category_trends.forEach((trend, index) => {
       if (!seenCategories.has(trend.category)) {
@@ -107,22 +106,14 @@ export default function AnalyticsScreen() {
         const totalAmount = trend.data.reduce((sum, item) => sum + Math.abs(item.amount), 0);
         categoryMap[trend.category] = totalAmount;
         seenCategories.add(trend.category);
-        console.log(`✅ ${trend.category}: ${totalAmount}€`);
       } else {
         // Doublon détecté - on ignore
         const totalAmount = trend.data.reduce((sum, item) => sum + Math.abs(item.amount), 0);
-        console.log(`❌ DOUBLON ${trend.category}: ${totalAmount}€ (ignoré)`);
       }
     });
     
     // Calculer notre propre total pour voir la différence avec l'API
     const ourCalculatedTotal = Object.values(categoryMap).reduce((sum, amount) => sum + amount, 0);
-    
-    console.log('=== RÉSULTAT FINAL ===');
-    console.log('Notre total calculé:', ourCalculatedTotal);
-    console.log('Total API:', totalExpenses);
-    console.log('Ratio:', (ourCalculatedTotal / totalExpenses).toFixed(2));
-    console.log('Breakdown par catégorie:', categoryMap);
 
     // Utiliser notre total calculé pour les pourcentages pour garantir que ça fait 100%
     const totalForPercentages = ourCalculatedTotal > 0 ? ourCalculatedTotal : totalExpenses;
