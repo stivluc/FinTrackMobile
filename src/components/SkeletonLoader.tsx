@@ -159,6 +159,31 @@ export const AnalyticsSkeleton: React.FC = () => {
   );
 };
 
+
+// Skeleton pour un item de la liste des transactions
+const TransactionSkeletonItem: React.FC = () => (
+  <View style={styles.transactionItem}>
+    <SkeletonLoader width={40} height={40} borderRadius={20} style={styles.transactionIcon} />
+    <View style={styles.transactionInfo}>
+      <SkeletonLoader width={'70%'} height={16} style={{ marginBottom: theme.spacing.xs }} />
+      <SkeletonLoader width={'40%'} height={12} />
+    </View>
+    <View style={styles.transactionAmountSkeleton}>
+      <SkeletonLoader width={60} height={16} style={{ marginBottom: theme.spacing.xs }} />
+      <SkeletonLoader width={40} height={12} />
+    </View>
+  </View>
+);
+
+// Skeleton pour la liste complète des transactions
+export const TransactionsSkeleton: React.FC = () => (
+  <View style={styles.sectionWithPadding}>
+    {Array.from({ length: 8 }).map((_, index) => (
+      <TransactionSkeletonItem key={index} />
+    ))}
+  </View>
+);
+
 const styles = StyleSheet.create({
   skeleton: {
     backgroundColor: colors.border.primary,
@@ -297,5 +322,25 @@ const styles = StyleSheet.create({
   },
   marginBottom: {
     marginBottom: theme.spacing.xs,
+  },
+  // Styles for TransactionsSkeleton
+  transactionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background.paper,
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.md,
+    marginBottom: theme.spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border.primary,
+  },
+  transactionIcon: {
+    marginRight: theme.spacing.md,
+  },
+  transactionInfo: {
+    flex: 1,
+  },
+  transactionAmountSkeleton: {
+    alignItems: 'flex-end',
   },
 });
